@@ -118,6 +118,7 @@ static const char *terminalNames[] = {
     [TK_COMMA]      = "TK_COMMA",
     [TK_EOF]        = "TK_EOF",
     [TK_ERROR]      = "TK_ERROR",
+    [TK_COMMENT]    = "TK_COMMENT",
     [TK_EPS]        = "TK_EPS"
 };
 
@@ -298,10 +299,11 @@ static Token makeToken(TokenType type, const char *lex, int line) {
 Token getNextToken(void) {
     skipWhitespace();
 
-    /* Skip comments */
-    while (pos < bufLen && buffer[pos] == '%') {
+    /* Return TK_COMMENT for comment lines */
+    if (pos < bufLen && buffer[pos] == '%') {
+        int commentLine = lineNum;
         skipComment();
-        skipWhitespace();
+        return makeToken(TK_COMMENT, "%", commentLine);
     }
 
     if (pos >= bufLen) {
@@ -316,7 +318,7 @@ Token getNextToken(void) {
         char lex[MAX_LEXEME_LEN];
         int i = 0;
         lex[i++] = advanceChar(); /* # */
-        while (pos < bufLen && (isalnum(buffer[pos]) || buffer[pos] == '_') && i < MAX_LEXEME_LEN - 1) {
+        while (pos < bufLen && islower(buffer[pos]) && i < MAX_LEXEME_LEN - 1) {
             lex[i++] = advanceChar();
         }
         lex[i] = '\0';
@@ -339,34 +341,77 @@ Token getNextToken(void) {
         if (strlen(lex) > 30) {
             fprintf(stderr, "Lexical Error at line %d: Function Identifier is longer than the prescribed length of 30 characters.\n", startLine);
             lex[30] = '\0';
+            return makeToken(TK_ERROR, lex, startLine);
         }
         return makeToken(TK_FUNID, lex, startLine);
     }
 
-    /* ---- Alphabetic: keywords or identifiers (TK_ID / TK_FIELDID) ---- */
-    if (isalpha(c)) {
+    /* ---- Alphabetic: keywords, TK_ID, or TK_FIELDID ---- */
+    /* TK_ID pattern:      [b-d][2-7][b-d]*[2-7]*
+     * TK_FIELDID pattern: [a-z][a-z]*  (only lowercase letters, no digits)
+     * Keywords match FIELDID pattern but are returned as their keyword token */
+    if (islower(c)) {
         char lex[MAX_LEXEME_LEN];
         int i = 0;
-        while (pos < bufLen && (isalnum(buffer[pos]) || buffer[pos] == '_') && i < MAX_LEXEME_LEN - 1) {
-            lex[i++] = advanceChar();
-        }
-        lex[i] = '\0';
+        int isTkId = 0;
 
-        /* Check if keyword */
+        /* Check if it could be TK_ID: first char in [b-d], second in [2-7] */
+        if (c >= 'b' && c <= 'd') {
+            lex[i++] = advanceChar(); /* first char [b-d] */
+            if (pos < bufLen && buffer[pos] >= '2' && buffer[pos] <= '7') {
+                /* TK_ID path */
+                isTkId = 1;
+                lex[i++] = advanceChar(); /* second char [2-7] */
+                /* Read [b-d]* */
+                while (pos < bufLen && buffer[pos] >= 'b' && buffer[pos] <= 'd' && i < MAX_LEXEME_LEN - 1) {
+                    lex[i++] = advanceChar();
+                }
+                /* Read [2-7]* */
+                while (pos < bufLen && buffer[pos] >= '2' && buffer[pos] <= '7' && i < MAX_LEXEME_LEN - 1) {
+                    lex[i++] = advanceChar();
+                }
+                lex[i] = '\0';
+            } else {
+                /* First char [b-d] but second not [2-7] → FIELDID path */
+                while (pos < bufLen && islower(buffer[pos]) && i < MAX_LEXEME_LEN - 1) {
+                    lex[i++] = advanceChar();
+                }
+                lex[i] = '\0';
+            }
+        } else {
+            /* First char [a-z] but not [b-d] → FIELDID path */
+            while (pos < bufLen && islower(buffer[pos]) && i < MAX_LEXEME_LEN - 1) {
+                lex[i++] = advanceChar();
+            }
+            lex[i] = '\0';
+        }
+
+        if (isTkId) {
+            if (strlen(lex) > 20) {
+                fprintf(stderr, "Lexical Error at line %d: Variable Identifier is longer than the prescribed length of 20 characters.\n", startLine);
+                lex[20] = '\0';
+                prevTokenWasDot = 0;
+                return makeToken(TK_ERROR, lex, startLine);
+            }
+            prevTokenWasDot = 0;
+            return makeToken(TK_ID, lex, startLine);
+        }
+
+        /* FIELDID path: check keyword first */
         TokenType kwType = lookupKeyword(lex);
         if (kwType != TK_ERROR) {
             prevTokenWasDot = 0;
             return makeToken(kwType, lex, startLine);
         }
 
-        /* If preceded by dot, this is a field id — but we emit TK_ID since
-         * the grammar uses TK_ID for field names too (lexically identical) */
         if (strlen(lex) > 20) {
             fprintf(stderr, "Lexical Error at line %d: Variable Identifier is longer than the prescribed length of 20 characters.\n", startLine);
-            lex[20] = '\0'; /* truncate */
+            lex[20] = '\0';
+            prevTokenWasDot = 0;
+            return makeToken(TK_ERROR, lex, startLine);
         }
         prevTokenWasDot = 0;
-        return makeToken(TK_ID, lex, startLine);
+        return makeToken(TK_FIELDID, lex, startLine);
     }
 
     /* ---- Numeric literals (TK_NUM / TK_RNUM) ---- */
@@ -376,7 +421,7 @@ Token getNextToken(void) {
         while (pos < bufLen && isdigit(buffer[pos]) && i < MAX_LEXEME_LEN - 1) {
             lex[i++] = advanceChar();
         }
-        /* Check for real number */
+        /* Check for real number: digits.digits(E[+-]?digits)? */
         if (pos < bufLen && buffer[pos] == '.' && (pos + 1 < bufLen) && isdigit(buffer[pos + 1])) {
             lex[i++] = advanceChar(); /* . */
             int decDigits = 0;
@@ -384,12 +429,45 @@ Token getNextToken(void) {
                 lex[i++] = advanceChar();
                 decDigits++;
             }
-            lex[i] = '\0';
-            prevTokenWasDot = 0;
             if (decDigits != 2) {
+                /* Consume any trailing E notation before reporting error */
+                if (pos < bufLen && (buffer[pos] == 'E' || buffer[pos] == 'e') && i < MAX_LEXEME_LEN - 1) {
+                    int peekOff = 1;
+                    if (pos + peekOff < bufLen && (buffer[pos + peekOff] == '+' || buffer[pos + peekOff] == '-'))
+                        peekOff++;
+                    if (pos + peekOff < bufLen && isdigit(buffer[pos + peekOff]) &&
+                        pos + peekOff + 1 < bufLen && isdigit(buffer[pos + peekOff + 1])) {
+                        lex[i++] = advanceChar(); /* E */
+                        if (pos < bufLen && (buffer[pos] == '+' || buffer[pos] == '-') && i < MAX_LEXEME_LEN - 1)
+                            lex[i++] = advanceChar();
+                        lex[i++] = advanceChar();
+                        lex[i++] = advanceChar();
+                    }
+                }
+                lex[i] = '\0';
+                prevTokenWasDot = 0;
                 fprintf(stderr, "Lexical Error at line %d: Unknown pattern <%s>\n", startLine, lex);
                 return makeToken(TK_ERROR, lex, startLine);
             }
+            /* Check for scientific notation E[+-]?[0-9]{2} (exactly 2 exponent digits) */
+            if (pos < bufLen && (buffer[pos] == 'E' || buffer[pos] == 'e') && i < MAX_LEXEME_LEN - 1) {
+                /* Peek ahead to verify valid E-notation before consuming */
+                int peekOff = 1;
+                if (pos + peekOff < bufLen && (buffer[pos + peekOff] == '+' || buffer[pos + peekOff] == '-'))
+                    peekOff++;
+                if (pos + peekOff < bufLen && isdigit(buffer[pos + peekOff]) &&
+                    pos + peekOff + 1 < bufLen && isdigit(buffer[pos + peekOff + 1])) {
+                    lex[i++] = advanceChar(); /* E */
+                    if (pos < bufLen && (buffer[pos] == '+' || buffer[pos] == '-') && i < MAX_LEXEME_LEN - 1) {
+                        lex[i++] = advanceChar(); /* + or - */
+                    }
+                    /* Read exactly 2 exponent digits */
+                    lex[i++] = advanceChar();
+                    lex[i++] = advanceChar();
+                }
+            }
+            lex[i] = '\0';
+            prevTokenWasDot = 0;
             return makeToken(TK_RNUM, lex, startLine);
         }
         lex[i] = '\0';
@@ -548,16 +626,12 @@ Token getNextToken(void) {
             fprintf(stderr, "Lexical Error at line %d: Unknown symbol '&'\n", startLine);
             return makeToken(TK_ERROR, "&", startLine);
 
-        case '|':
-            advanceChar();
-            if (pos + 1 < bufLen && buffer[pos] == '|' && buffer[pos+1] == '|') {
-                advanceChar(); advanceChar();
-                prevTokenWasDot = 0;
-                return makeToken(TK_OR, "|||", startLine);
-            }
+        case '|': {
+            char lex2[2] = {advanceChar(), '\0'};
             prevTokenWasDot = 0;
-            fprintf(stderr, "Lexical Error at line %d: Unknown symbol '|'\n", startLine);
-            return makeToken(TK_ERROR, "|", startLine);
+            fprintf(stderr, "Lexical Error at line %d: Unknown symbol '%s'\n", startLine, lex2);
+            return makeToken(TK_ERROR, lex2, startLine);
+        }
 
         case '@':
             advanceChar();
@@ -620,6 +694,5 @@ void printAllTokens(const char *filename) {
             /* error already printed in getNextToken */
         }
     } while (t.type != TK_EOF);
-    printf("%-25s %-25s %d\n", "TK_EOF", "$", t.lineNum);
     cleanupLexer();
 }

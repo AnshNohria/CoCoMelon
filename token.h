@@ -78,6 +78,7 @@ typedef enum {
     /* Special */
     TK_EOF,
     TK_ERROR,
+    TK_COMMENT, /* % comment line */
     TK_EPS,     /* epsilon in grammar */
 
     NUM_TERMINALS

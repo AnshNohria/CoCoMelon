@@ -87,6 +87,15 @@ static ParseTreeNode* createEpsilonLeaf(void) {
 /* ---- Error tracking ---- */
 static int syntaxErrorCount = 0;
 
+/* ---- Helper: get next meaningful token (skip comments and errors) ---- */
+static Token getNextParserToken(void) {
+    Token t;
+    do {
+        t = getNextToken();
+    } while (t.type == TK_COMMENT || t.type == TK_ERROR);
+    return t;
+}
+
 /* ---- Main parsing function ---- */
 ParseTreeNode* parseInputSource(void) {
     syntaxErrorCount = 0;
@@ -108,7 +117,7 @@ ParseTreeNode* parseInputSource(void) {
     startEntry.node = root;
     stackPush(startEntry);
 
-    Token currentToken = getNextToken();
+    Token currentToken = getNextParserToken();
 
     while (!stackEmpty()) {
         StackEntry top = stackPeek();
@@ -130,7 +139,7 @@ ParseTreeNode* parseInputSource(void) {
                     top.node->lineNum = currentToken.lineNum;
                 }
                 if (currentToken.type != TK_EOF) {
-                    currentToken = getNextToken();
+                    currentToken = getNextParserToken();
                 }
             } else {
                 /* Mismatch error */
@@ -164,7 +173,7 @@ ParseTreeNode* parseInputSource(void) {
                 if (currentToken.type == TK_EOF || followSet[nt][(int)currentToken.type]) {
                     stackPop();
                 } else {
-                    currentToken = getNextToken();
+                    currentToken = getNextParserToken();
                 }
             } else {
                 /* Valid production found */

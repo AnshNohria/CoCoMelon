@@ -165,7 +165,7 @@ static void loadGrammarRules(void) {
 
     /* Rule 26: <fieldDefinition> -> TK_TYPE <fieldType> TK_COLON TK_FIELDID TK_SEM */
     rhs[0] = T(TK_TYPE); rhs[1] = NT(NT_fieldType); rhs[2] = T(TK_COLON);
-    rhs[3] = T(TK_ID); rhs[4] = T(TK_SEM);
+    rhs[3] = T(TK_FIELDID); rhs[4] = T(TK_SEM);
     addRuleArr(NT_fieldDefinition, rhs, 5);
 
     /* Rule 27: <fieldType> -> <primitiveDatatype> */
@@ -246,7 +246,7 @@ static void loadGrammarRules(void) {
     addRuleArr(NT_option_single_constructed, rhs, 2);
 
     /* Rule 47: <oneExpansion> -> TK_DOT TK_FIELDID */
-    rhs[0] = T(TK_DOT); rhs[1] = T(TK_ID);
+    rhs[0] = T(TK_DOT); rhs[1] = T(TK_FIELDID);
     addRuleArr(NT_oneExpansion, rhs, 2);
 
     /* Rule 48: <moreExpansions> -> <oneExpansion> <moreExpansions> */
