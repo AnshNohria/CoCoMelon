@@ -53,3 +53,13 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Generated output files
+pt*.txt
+ptout*.txt
+tokenlist.txt
+t6_errors.txt
+parsetree_final.txt
+
+# Archive files
+*.rar

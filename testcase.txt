@@ -1,0 +1,30 @@
+% This is a test case for the compiler front-end
+% Testing basic constructs of the language
+
+_addition input parameter list [int a2, int b3]
+output parameter list [int c4];
+type int : result;
+result <--- a2 + b3;
+return [result];
+end
+
+_multiply input parameter list [real x1, real y2]
+output parameter list [real z3];
+type real : product;
+product <--- x1 * y2;
+return [product];
+end
+
+_main
+type int : a1;
+type int : b2;
+type int : c3;
+
+read(a1);
+read(b2);
+
+[c3] <--- call _addition with parameters [a1, b2];
+write(c3);
+
+return;
+end
