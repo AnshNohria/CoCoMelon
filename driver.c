@@ -2,6 +2,8 @@
  * driver.c - Main driver for the compiler front-end (Stage 1)
  * CS F363 - Compiler Construction
  *
+ * Group: CoCoMelon
+ *
  * Usage: ./stage1exe testcase.txt parsetreeOutFile.txt
  */
 

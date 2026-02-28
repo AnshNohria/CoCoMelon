@@ -1,6 +1,8 @@
 /*
  * parser.c - LL(1) Predictive Parser with Parse Tree construction
  * CS F363 - Compiler Construction
+ *
+ * Group: CoCoMelon
  */
 
 #include <stdio.h>

@@ -1,13 +1,14 @@
 /*
  * lexer.c - Lexical analyzer implementation
  * CS F363 - Compiler Construction
+ *
+ * Group: CoCoMelon
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
-#include "lexer.h"
 #include "token.h"
 
 /* ---- Internal state ---- */
@@ -680,19 +681,52 @@ void printCommentFreeCode(const char *filename) {
     fclose(fp);
 }
 
+/* ---- removeComments: write comment-free code to a file ---- */
+void removeComments(const char *testcaseFile, const char *cleanFile) {
+    FILE *inFp = fopen(testcaseFile, "r");
+    if (!inFp) {
+        fprintf(stderr, "Error: Cannot open file '%s'\n", testcaseFile);
+        return;
+    }
+    FILE *outFp = fopen(cleanFile, "w");
+    if (!outFp) {
+        fprintf(stderr, "Error: Cannot open file '%s' for writing\n", cleanFile);
+        fclose(inFp);
+        return;
+    }
+    int ch;
+    int inComment = 0;
+    while ((ch = fgetc(inFp)) != EOF) {
+        if (inComment) {
+            if (ch == '\n') {
+                inComment = 0;
+                fputc('\n', outFp);
+            }
+        } else {
+            if (ch == '%') {
+                inComment = 1;
+            } else {
+                fputc(ch, outFp);
+            }
+        }
+    }
+    fclose(inFp);
+    fclose(outFp);
+}
+
 /* ---- Option 2: Print all tokens ---- */
 void printAllTokens(const char *filename) {
     initLexer(filename);
-    printf("%-25s %-25s %s\n", "Token", "Lexeme", "Line No.");
-    printf("-----------------------------------------------------------\n");
     Token t;
     do {
         t = getNextToken();
-        if (t.type != TK_EOF && t.type != TK_ERROR) {
-            printf("%-25s %-25s %d\n", getTerminalName(t.type), t.lexeme, t.lineNum);
-        } else if (t.type == TK_ERROR) {
+        if (t.type == TK_EOF) break;
+        if (t.type == TK_ERROR) {
             /* error already printed in getNextToken */
+            continue;
         }
-    } while (t.type != TK_EOF);
+        printf("Line no. %d\t Lexeme %s\t Token %s\n",
+               t.lineNum, t.lexeme, getTerminalName(t.type));
+    } while (1);
     cleanupLexer();
 }

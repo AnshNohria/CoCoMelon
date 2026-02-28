@@ -1,12 +1,15 @@
 /*
  * grammar.h - Grammar rules, FIRST/FOLLOW sets, parse table
  * CS F363 - Compiler Construction
+ *
+ * Group: CoCoMelon
  */
 
 #ifndef GRAMMAR_H
 #define GRAMMAR_H
 
-#include "token.h"
+#include "lexerDef.h"
+#include "parserDef.h"
 
 /* Maximum symbols on RHS of any production */
 #define MAX_RHS 10

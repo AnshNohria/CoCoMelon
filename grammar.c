@@ -1,6 +1,8 @@
 /*
  * grammar.c - Grammar rules, automated FIRST/FOLLOW computation, parse table
  * CS F363 - Compiler Construction
+ *
+ * Group: CoCoMelon
  */
 
 #include <stdio.h>
